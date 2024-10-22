@@ -1,0 +1,12 @@
+Django==4.2.9
+djangorestframework 
+requests
+yfinance
+wordcloud
+python-dotenv
+finnhub-python
+beautifulsoup4
+nltk
+vaderSentiment
+pandas
+scikit-learn

@@ -1,0 +1,645 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+<div class="container-fluid">
+
+  <input type="hidden" id="is-authenticated" value="{{ user.is_authenticated }}" />
+  
+    <div class="col-sm">
+      <nav class="col-1 flex-column navbar bg-primary" id="sidebar" style="padding-top: 5px">
+      <div id="navbarStocks">
+        <ul class="navbar-nav mb-0">
+          <li class="nav-item-stocks">
+            <form class="d-flex" action="{% url 'stocks' %}" method="get">
+              <input class="form-control me-sm-1" type="search" name="query" placeholder="Search" value="{{ request.GET.query }}" style="height: 1vh; width: 10vh; padding-left: 3px">
+              <button class="btn btn-secondary my-2 my-sm-0" type="submit" style="height: 2.8vh; width: 3.5vh; padding-top: 2px">GO</button>
+            </form>
+          </li>
+          <div class="stocks-list" style="height: calc(100vh - 40vh); overflow-y: auto">
+            {% for stock_name in stock_names %}
+            <a class="nav-link btn btn-secondary" style="text-align: left; padding-top: 2px; padding-bottom: 0px;" href="javascript:void(0);" onclick="addNewCard('{{ stock_name }}')">
+              {{ stock_name }}
+            </a>
+            {% endfor %}
+          </div>
+        </ul>
+      </div>
+      <div id="navbarFavourites">
+        <hr style="margin-bottom: 5px; margin-top: 5px;">
+        <h4 style="margin-bottom: 2px; margin">Favourites</h4>
+        <div class="favourites-list" style="height: 27vh; overflow-y: auto;">
+          {% if user.is_authenticated %}
+            {% for stock_name in favourite_stocks %}
+            <a class="nav-link favourite btn btn-secondary" style="text-align: left" href="javascript:void(0);" onclick="addNewCard('{{ stock_name }}')">
+              {{ stock_name }}
+            </a>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted">
+              Login or sign up to access favourites.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+      </nav>
+        <div class="row mt-1" id="main-content">
+        </div>
+    </div>  
+</div>
+
+<script>
+  const apiKey = '{{ api_key }}';
+
+  function addNewCard(stockSymbol) {
+    const articlesContainer = document.getElementById('main-content');
+    articlesContainer.innerHTML = '';
+    articlesContainer.style.display = 'flex';
+    articlesContainer.style.flexDirection = 'row';
+
+    const stockHeader = document.createElement('div');
+    stockHeader.classList.add('stock-header');
+    stockHeader.style.display = 'flex';
+    stockHeader.style.alignItems = 'center';
+    stockHeader.style.justifyContent = 'space-between';
+    stockHeader.style.paddingTop = '0';
+
+    const stockNameTitle = document.createElement('h2');
+    stockNameTitle.textContent = stockSymbol;
+    stockHeader.appendChild(stockNameTitle);
+
+    const isAuthenticated = document.getElementById('is-authenticated').value === "True";
+
+    if (isAuthenticated) {
+        const faveButton = document.createElement('button');
+        faveButton.classList.add('faveButton', 'btn', 'btn-secondary');
+        faveButton.textContent = 'Check Favourite';
+        checkIfFavourite(stockSymbol, faveButton);
+        faveButton.onclick = function() { toggleFavourite(stockSymbol, faveButton); };
+        stockHeader.appendChild(faveButton);
+    }
+
+
+    //Column 1
+    const cardsColumn1 = document.createElement('div');
+    cardsColumn1.className = 'col-5';
+    cardsColumn1.style.paddingRight = '0px';
+    
+    cardsColumn1.appendChild(stockHeader);
+
+    //Card for prediction
+    const predictionsCard = createCard("Tomorrow's prediction", '', 'predictionsCard', '');
+    cardsColumn1.appendChild(predictionsCard);
+    
+    loadPrediction(stockSymbol);
+    const chartCard = createCard('Sentiment Chart', '', 'sentimentChartCard', 'col mt-1');
+    cardsColumn1.appendChild(chartCard);
+    const card5 = createCard('Financials', '', 'card5', 'col mt-1');
+    cardsColumn1.appendChild(card5);
+    displayFinancials(card5, stockSymbol);
+
+    //Column 2
+    const cardsColumn2 = document.createElement('div');
+    cardsColumn2.className = 'col-4';
+    cardsColumn2.style.paddingRight = '0px';
+
+    const stockCard = createCard('Stock price', '', 'stockCard', 'col');
+    const stockPriceContainer = document.createElement('div');
+    stockCard.querySelector('.card-body').appendChild(stockPriceContainer);
+    loadStockPrice(stockSymbol, stockPriceContainer);
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'stockChart';
+    stockCard.querySelector('.card-body').appendChild(canvas);
+    stockChart(stockSymbol);
+    sentimentChart(stockSymbol);
+    cardsColumn2.appendChild(stockCard);
+
+    const combinedChartCard = createCard('Stock vs sentiment data', '', 'combinedChartCard', 'mt-1');
+    cardsColumn2.appendChild(combinedChartCard);
+    stockAndSentimentChart(stockSymbol);
+
+    //Articles
+    const articlesColumn = document.createElement('div');
+    articlesColumn.className = 'col-md-2';
+    articlesColumn.style.paddingRight = '0px';
+    const articlesBigCard = createCard('Articles', '', 'articlesBigCard', 'h-100');
+    articlesColumn.appendChild(articlesBigCard);
+    articlesBigCard.style.height = '100%';
+
+    //add to main row
+    const mainRow = document.createElement('div');
+    mainRow.className = 'row flex-row-reverse pb-1';
+    mainRow.style.paddingRight = '0px';
+    mainRow.appendChild(articlesColumn);
+    mainRow.appendChild(cardsColumn2);
+    mainRow.appendChild(cardsColumn1);
+
+    articlesContainer.appendChild(mainRow);
+
+    loadArticles(stockSymbol);
+  }
+
+  function loadArticles(stockSymbol) {
+    fetch(`/api/stock-articles?stock_name=${encodeURIComponent(stockSymbol)}`)
+    .then(response => response.json())
+    .then(data => {
+        const articlesBigCard = document.querySelector('#articlesBigCard .card-body');
+        articlesBigCard.innerHTML = '';
+        articlesBigCard.style.maxHeight = '90vh';
+        articlesBigCard.style.overflowY = 'auto';
+        articlesBigCard.style.padding = '1vh';
+        articlesBigCard.style.paddingTop = '0vh';
+        
+        const header = document.createElement('div');
+        header.className = 'articles-header';
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.padding = '10px';
+
+        const title = document.createElement('h5');
+        title.textContent = 'News';
+        title.style.marginBottom = '0px';
+        title.style.paddingRight = '10px';
+        header.appendChild(title);
+
+        const sortSelect = document.createElement('select');
+        sortSelect.className = 'form-control';
+        sortSelect.style.padding = '2px';
+        sortSelect.style.width = '30vh';
+        sortSelect.style.textAlign = 'center';
+        sortSelect.style.textAlignLast = 'center'
+
+        sortSelect.innerHTML = `
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="positive">Most Positive</option>
+            <option value="negative">Least Positive</option>
+        `;
+        sortSelect.addEventListener('change', () => {
+            sortArticles(data, sortSelect.value, articlesBigCard);
+        });
+
+        sortSelect.addEventListener('focus', () => {
+            sortSelect.querySelectorAll('option').forEach(option => {
+                option.style.color = 'black';
+            });
+        });
+
+        header.appendChild(sortSelect);
+        articlesBigCard.appendChild(header);
+
+        sortArticles(data, 'newest', articlesBigCard);
+    })
+    .catch(error => console.error('Error loading articles:', error));
+}
+
+function sortArticles(data, sortMethod, container) {
+  let sortedData = JSON.parse(JSON.stringify(data));
+    switch (sortMethod) {
+        case 'newest':
+            sortedData.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+            break;
+        case 'oldest':
+            sortedData.sort((a, b) => new Date(a.published_at) - new Date(b.published_at));
+            break;
+        case 'positive':
+            sortedData.sort((a, b) => parseFloat(b.sentiment_scores) - parseFloat(a.sentiment_scores));
+            break;
+        case 'negative':
+            sortedData.sort((a, b) => parseFloat(a.sentiment_scores) - parseFloat(b.sentiment_scores));
+            break;
+    }
+
+  Array.from(container.children).forEach(child => {
+      if (child !== container.firstChild) {
+          child.remove();
+      }
+  });
+
+  sortedData.forEach(article => {
+      const articleCard = document.createElement('div');
+      articleCard.className = 'mb-1 article-card';
+      articleCard.style.marginTop = '0px';
+      articleCard.style.paddingTop = '0px';
+      articleCard.style.paddingRight = '1vh';
+      articleCard.style.paddingLeft = '1vh'; 
+      articleCard.innerHTML = `
+          <div class="card">
+              <div class="card-body p-2">
+                  <h6 class="card-title mb-1">${article.title}</h6>
+                  <p class="card-text mb-1">
+                      <small class="text-muted">Published at: ${new Date(article.published_at).toLocaleDateString()}</small>
+                      
+                      <small class="text-muted">Sentiment Score: ${article.sentiment_scores ? parseFloat(article.sentiment_scores).toFixed(2) : 'N/A'}</small>
+                  </p>
+                  <a href="${article.url}" target="_blank" class="btn btn-sm btn-primary">Read more</a>
+              </div>
+          </div>`;
+      container.appendChild(articleCard);
+  });
+}
+
+  function loadPrediction(stockSymbol) {
+    fetch(`/api/stock-predictions/${encodeURIComponent(stockSymbol)}`)
+    .then(response => response.json())
+    .then(data => {
+        const nextDayPrediction = data.predictions[0];
+        const predictionsHtml = `$${nextDayPrediction.toFixed(2)}`;
+        const predictionsCard = document.querySelector('#predictionsCard .text-muted');
+        if (predictionsCard) {
+            predictionsCard.textContent = predictionsHtml;
+            predictionsCard.style.padding = '0px';
+        }
+    })
+    .catch(error => console.error('Error loading stock predictions:', error));
+  }
+  
+  function stockChart(stockSymbol) {
+    fetch(`/api/stock-data/${encodeURIComponent(stockSymbol)}`)
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('stockChart').getContext('2d');
+            if (!ctx) {
+                console.error('Canvas context is not available');
+                return;
+            }
+            const dates = data.map(item => item.Date.split('T')[0]);
+            const prices = data.map(item => item.Close);
+            const stockChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: `${stockSymbol} Stock Price`,
+                        data: prices,
+                        borderColor: 'rgb(87, 198, 201)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                  scales: {
+                      x: {
+                          ticks: {
+                              color: 'black',
+                              fontSize: 14
+                          }
+                      },
+                      y: {
+                          beginAtZero: false,
+                          ticks: {
+                              color: 'black',
+                              fontSize: 14 
+                          }
+                      }
+                  },
+                  plugins: {
+                      legend: {
+                          labels: {
+                              color: 'black',
+                              fontSize: 14 
+                          }
+                      }
+                  }
+              }
+            });
+        })
+        .catch(error => console.error('Error loading stock chart:', error));
+  }
+
+  function createCard(title, content, id, additionalClass) {
+    const card = document.createElement('div');
+    card.className = `card ${additionalClass}`;
+    card.id = id;
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.overflow = 'auto';
+
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body';
+    cardBody.style.flexGrow = '1';
+    cardBody.style.display = 'flex';
+    cardBody.style.flexDirection = 'column';
+    cardBody.style.padding = '2vh';
+
+    const cardHeader = document.createElement('div');
+    cardHeader.className = 'd-flex justify-content-between align-items-center';
+    cardHeader.style.padding = '0px';
+
+    const cardTitle = document.createElement('h5');
+    cardTitle.className = 'card-title mb-0';
+    cardTitle.textContent = title;
+
+    const cardText = document.createElement('span');
+    cardText.className = 'text-muted';
+    cardText.textContent = content;
+
+    cardHeader.appendChild(cardTitle);
+    cardHeader.appendChild(cardText);
+    cardBody.appendChild(cardHeader);
+    card.appendChild(cardBody);
+
+    if (id === 'sentimentChartCard') {
+      const tooltipIcon = document.createElement('i');
+      tooltipIcon.classList.add('bi', 'bi-info-circle');
+      tooltipIcon.setAttribute('data-bs-toggle', 'tooltip');
+      tooltipIcon.setAttribute('data-bs-placement', 'top');
+      tooltipIcon.setAttribute('title', 'Scores range between 1 and -1. With 1 being the most positive.');
+      cardHeader.appendChild(tooltipIcon);
+  }
+
+    if (id === 'sentimentChartCard' || id === 'combinedChartCard') {
+      const canvas = document.createElement('canvas');
+      canvas.id = (id === 'sentimentChartCard') ? 'sentimentChart' : 'combinedChart';
+      cardBody.appendChild(canvas);
+  }
+    return card;
+}
+
+function toggleFavourite(stockSymbol, faveButton) {
+  fetch(`/toggle-favourite/?stock_name=${encodeURIComponent(stockSymbol)}`, {
+      method: 'POST',
+      headers: {
+          'X-CSRFToken': getCookie('csrftoken'),
+          'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 'stock_name': stockSymbol }),
+  })
+  .then(response => response.json())
+  .then(data => {
+      faveButton.textContent = data.is_favourite ? 'Unfavourite' : 'Favourite';
+      
+      // Check if the favorites list is displayed on the page
+      const favouritesList = document.querySelector('.favourites-list');
+      if (favouritesList) {
+          if (data.is_favourite) {
+              const stockLink = document.createElement('a');
+              stockLink.classList.add('nav-link', 'favourite', 'btn', 'btn-secondary');
+              stockLink.style.textAlign = 'left';
+              stockLink.href = 'javascript:void(0);';
+              stockLink.onclick = function() { addNewCard(stockSymbol); };
+              stockLink.textContent = stockSymbol;
+              favouritesList.appendChild(stockLink);
+          } else {
+              const stockLinks = favouritesList.querySelectorAll('.nav-link');
+              stockLinks.forEach(link => {
+                  if (link.textContent === stockSymbol) {
+                      link.remove();
+                  }
+              });
+          }
+      }
+  })
+  .catch(error => console.error('Error toggling favourite status:', error));
+}
+
+  function checkIfFavourite(stockSymbol, faveButton) {
+    fetch(`/is-favourite/?stock_name=${encodeURIComponent(stockSymbol)}`)
+    .then(response => response.json())
+    .then(data => {
+        faveButton.textContent = data.is_favourite ? 'Unfavourite' : 'Favourite';
+    })
+    .catch(error => console.error('Error checking favourite status:', error));
+  }
+
+  function loadStockPrice(stockSymbol, container) {
+    const url = `https://finnhub.io/api/v1/quote?symbol=${stockSymbol}&token=${apiKey}`;
+
+    fetch(url)
+    .then(response => response.json())
+    .then(data => {
+        
+        const stockPriceText = document.createElement('card-text');
+        stockPriceText.textContent = `Current Price: $${data.c}`;
+
+        container.appendChild(stockPriceText);
+    })
+    .catch(error => console.error('Error fetching stock price:', error));
+  }
+
+  function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+              const cookie = cookies[i].trim();
+              if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                  cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                  break;
+              }
+          }
+      }
+      return cookieValue;
+  }
+
+  function displayFinancials(cardElement, stockSymbol) {
+    const url = `https://finnhub.io/api/v1/stock/metric?symbol=${stockSymbol}&metric=all&token=${apiKey}`;
+
+    const labelMappings = {
+        'peNormalizedAnnual': 'P/E Ratio',
+        '52WeekLow': '52 Week Low',
+        '52WeekHigh': '52 Week High',
+        '10DayAverageTradingVolume': '10 Day Average Trading Volume'
+    };
+
+    const infoText = {
+        'peNormalizedAnnual': 'This measures the company’s current share, price relative to its per-share earnings.',
+        '52WeekLow': 'The lowest stock price in the last 52 weeks.',
+        '52WeekHigh': 'The highest stock price in the last 52 weeks.',
+        '10DayAverageTradingVolume': 'Average amount of shares traded over the last 10 days.'
+    };
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.metric) {
+                const financials = data.metric;
+                Object.keys(labelMappings).forEach(metricKey => {
+                    const metricValue = financials[metricKey];
+                    if (metricValue) {
+                        const metricElement = document.createElement('div');
+                        metricElement.className = 'd-flex justify-content-between align-items-center';
+                        
+                        const textElement = document.createElement('span');
+                        textElement.textContent = `${labelMappings[metricKey]}: ${metricValue}`;
+
+                        const icon = document.createElement('i');
+                        icon.className = 'bi bi-info-circle ms-2';
+                        icon.setAttribute('data-bs-toggle', 'tooltip');
+                        icon.setAttribute('data-bs-placement', 'top');
+                        icon.setAttribute('title', infoText[metricKey]);
+
+                        metricElement.appendChild(textElement);
+                        metricElement.appendChild(icon);
+                        cardElement.querySelector('.card-body').appendChild(metricElement);
+                    }
+                });
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+              }
+        })
+        .catch(error => console.error('Error fetching financial data:', error));
+  }
+
+  function sentimentChart(stockSymbol) {
+    const apiUrl = `/api/sentiment-scores/${encodeURIComponent(stockSymbol)}`;
+    fetch(apiUrl)
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('sentimentChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Daily Average Sentiment Score',
+                    data: data.scores,
+                    borderColor: 'rgb(227, 18, 126)',
+                    tension: 0.1,
+                    fill: false,
+                    
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                      ticks: {
+                          color: 'black',
+                          fontSize: 14
+                      }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                          color: 'black',
+                          fontSize: 14
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                          color: 'black',
+                          fontSize: 14
+                      }
+                    },
+                    annotation: {
+                        annotations: {
+                            line1: {
+                                type: 'line',
+                                yMin: 0,
+                                yMax: 0,
+                                borderColor: 'rgb(171, 171, 171)',
+                                borderWidth: 1,
+
+                                z: 0, //put line behind datapoints
+                            }
+                        }
+                    }
+                    
+                }
+            }
+        });
+    })
+    .catch(error => console.error('Error loading sentiment chart:', error));
+  }
+
+  function stockAndSentimentChart(stockSymbol) {
+    const sentimentScoresUrl = `/api/sentiment-scores/${encodeURIComponent(stockSymbol)}`;
+    const stockDataUrl = `/api/stock-data/${encodeURIComponent(stockSymbol)}`;
+
+    Promise.all([
+      fetch(sentimentScoresUrl).then(response => response.json()),
+      fetch(stockDataUrl).then(response => response.json())
+    ]).then(([sentimentData, stockData]) => {
+
+      const sentimentScoresByDate = sentimentData.dates.reduce((acc, date, index) => {
+        acc[date] = sentimentData.scores[index];
+        return acc;
+      }, {});
+
+      const filteredStockData = stockData.filter(data => sentimentScoresByDate[data.Date.split('T')[0]] !== undefined);
+
+      const combinedData = filteredStockData.map(stock => {
+        const date = stock.Date.split('T')[0];
+        return {
+          date: date,
+          stockPrice: stock.Close,
+          sentimentScore: sentimentScoresByDate[date] || 0 //default to 0 if no score
+        };
+      });
+
+      const ctx = document.getElementById('combinedChart').getContext('2d');
+      const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: combinedData.map(data => data.date),
+          datasets: [
+            {
+              label: `${stockSymbol} Stock Price`,
+              data: combinedData.map(data => data.stockPrice),
+              borderColor: 'rgb(87, 198, 201)',
+              yAxisID: 'y-axis-stock'
+            },
+            {
+              label: 'Daily Average Sentiment Score',
+              data: combinedData.map(data => data.sentimentScore),
+              borderColor: 'rgb(227, 18, 126)',
+              yAxisID: 'y-axis-sentiment'
+            }
+          ]
+        },
+        options: {
+          scales: {
+            x: {
+              ticks: {
+                  color: 'black',
+                  fontSize: 14
+              }
+          },
+            'y-axis-stock': {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              ticks: {
+                color: 'black',
+                fontSize: 14
+            }
+            },
+            'y-axis-sentiment': {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              beginAtZero: false,
+              grid: {
+                drawOnChartArea: false,
+              },
+              ticks: {
+                color: 'black',
+                fontSize: 14
+            }
+            }
+          },
+
+          plugins: {
+            legend: {
+                display: true,
+                labels: {
+                  color: 'black',
+                  fontSize: 14
+              }
+            }
+            
+          }
+        }
+      });
+    }).catch(error => console.error('Error loading stock and sentiment data:', error));
+  }
+</script>
+
+{% endblock %}

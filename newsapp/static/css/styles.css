@@ -1,0 +1,82 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+#topNav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    height: 50px;
+}
+
+#sidebar {
+    position: fixed;
+    left: 0;
+    top: 50px;
+    overflow-x: hidden;
+}
+
+#sidebar button, #sidebar h3 {
+    width: 100%;
+    padding: 5px;
+    text-align: left;
+    text-transform: uppercase;
+    margin-top: 0;
+}
+
+#main-content {
+    height: calc(100vh - 60px);
+    overflow: hidden;
+    display: flex;
+    margin: 0;
+}
+
+.stock-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+}
+
+.stock-header h2 {
+    margin: 0;
+}
+
+.card img {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+}
+
+.card-body {
+    display: flex;
+    flex-direction: column;
+
+}
+
+.faveButton {
+    width: 160px;
+    height: 38px;
+    padding-top: 7px;
+}
+
+.row.flex-row-reverse {
+    margin-right: 0;
+    margin-left: 0;
+    display: flex;
+}
+
+.col-md-5{
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-right: 0;
+}
+
+.articlesBigCard {
+    flex-grow: 1;
+    margin-bottom: 4px;
+}

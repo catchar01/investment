@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container-fluid mt-2">
+    <div class="row">
+        <div class="col-md-3 mb-2">
+            <div class="card p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Sentiment
+                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Average daily sentiment overall for past 2 weeks."></i>
+                    </h5>
+                    <canvas id="sentChartGen"></canvas>
+                </div>
+            </div>
+            <div class="card mt-2 p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Volume
+                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Volume of S&P 500 stocks traded. Provides insight into market activity and liquidity."></i>
+                    </h5>
+                    <canvas id="sp500VolumeChart"></canvas> 
+                </div>
+            </div>
+        </div>
+
+        <div class="col-3 mb-1">
+            <div class="card p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">VIX
+                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="
+                        The VIX, or Volatility Index, measures expected volatility based on the S&P 500 index. The higher it is, the more volatile."></i>
+                    </h5>
+                    <canvas id="vixChart"></canvas> 
+                </div>
+            </div>
+            <div class="card mt-2 p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">SP500
+                        <i class="bi bi-info-circle tooltip-top-right" data-bs-toggle="tooltip" data-bs-placement="top" title="S&P 500 close values. 
+                        The S&P 500 is a stock market index measuring stock performance of 500 large companies in the US."></i>
+                    </h5>
+                    <canvas id="sp500Chart"></canvas> 
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Sector averages
+                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Average sector sentiment."></i>
+                        
+                    </h5>
+                    <canvas id="sectSentBar"></canvas>
+                </div>
+            </div>
+            <div class="card mt-2 p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Sector sentiments
+                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Click labels at top to remove or add back data for desired sectors."></i>
+                    </h5>
+                    <canvas id="sectSentLine"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Highest climbers
+                    </h5>
+                    <ul>
+                        {% for stock, change in top_stocks %}
+                        <li>{{ stock }}: {{ change|floatformat:2 }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="card mt-1 p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Highest decliners
+                    </h5>
+                    <ul>
+                        {% for stock, change in bot_stocks %}
+                        <li>{{ stock }}: {{ change|floatformat:2 }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="card mt-1 p-1">
+                <div class="card-body p-1">
+                    <h5 class="card-title">Popular topics
+                    </h5>
+                    <ul>
+                        {% for word, sentiment in top_topics.items %}
+                        <li class="{{ sentiment }}">{{ word }} - {{ sentiment }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        const sentDates = {{ sent_dates|safe }};
+        const sentScores = {{ sent_scores|safe }};
+        
+        const sentCtx = document.getElementById('sentChartGen').getContext('2d');
+        new Chart(sentCtx, {
+            type: 'line',
+            data: {
+                labels: sentDates,
+                datasets: [{
+                    label: 'Average Daily Sentiment',
+                    data: sentScores,
+                    borderColor: 'rgb(227, 18, 126)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                            
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    }
+                }
+            }
+        });
+
+        const vixDates = {{ vix_dates|safe }};
+        const vixValues = {{ vix_values|safe }};
+        
+        const vixCtx = document.getElementById('vixChart').getContext('2d');
+        new Chart(vixCtx, {
+            type: 'line',
+            data: {
+                labels: vixDates,
+                datasets: [{
+                    label: 'VIX Close',
+                    data: vixValues,
+                    borderColor: 'rgb(255, 159, 64)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        ticks: {
+                            color: 'black', 
+                            fontSize: 14 
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: 'black', 
+                            fontSize: 14
+                            
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    }
+                }
+            }
+        });
+
+        const sp500ChartCtx = document.getElementById('sp500Chart').getContext('2d');
+        new Chart(sp500ChartCtx, {
+            type: 'line',
+            data: {
+                labels: {{ sp500_dates|safe }},
+                datasets: [{
+                    label: 'S&P 500 Close',
+                    data: {{ sp500_values|safe }},
+                    borderColor: 'rgb(227, 18, 126)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                            
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    }
+                }
+            }
+        });
+
+        const volumeCtx = document.getElementById('sp500VolumeChart').getContext('2d');
+        new Chart(volumeCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ volume_dates|safe }},
+                datasets: [{
+                    label: 'S&P 500 Volume',
+                    data: {{ volume_values|safe }},
+                    backgroundColor: 'rgb(255, 159, 64)',
+                    borderColor: 'rgb(255, 159, 64)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                            
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    }
+                }
+            }
+        });
+
+        const sectorData = JSON.parse('{{ sect_sent_bar|safe }}');
+        const sectorctx = document.getElementById('sectSentBar').getContext('2d');
+        new Chart(sectorctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(sectorData),
+                datasets: [{
+                    label: 'Average Sentiment',
+                    data: Object.values(sectorData),
+                    backgroundColor: Object.values(sectorData).map(value => value > 0 ? 'rgb(87, 198, 201)' : 'rgb(87, 198, 201)'),
+                    borderColor: Object.values(sectorData).map(value => value > 0 ? 'rgb(87, 198, 201)' : 'rgb(87, 198, 201)'),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            color: 'black',
+                            fontSize: 14
+                            
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'black',
+                            fontSize: 14
+                        }
+                    }
+                }
+            }
+        });
+
+        const sectDailyAvgSentiments = JSON.parse('{{ sect_sent_line|safe }}');
+
+        const sectorColors = [
+    'rgb(255, 99, 132)',
+    'rgb(54, 162, 235)',
+    'rgb(255, 205, 86)',
+    'rgb(75, 192, 192)',
+    'rgb(153, 102, 255)',
+    'rgb(255, 159, 64)',
+    'rgb(255, 0, 255)',
+    'rgb(0, 255, 255)',
+    'rgb(128, 128, 128)',
+    'rgb(0, 128, 0)'
+        ];
+
+        function getSectorColor(index) {
+            return sectorColors[index % sectorColors.length];
+        }
+
+        const sectorChart = new Chart(
+            document.getElementById('sectSentLine').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: Object.keys(sectDailyAvgSentiments[Object.keys(sectDailyAvgSentiments)[0]]),
+                    datasets: Object.keys(sectDailyAvgSentiments).map((sector, index) => ({
+                        label: sector,
+                        data: Object.values(sectDailyAvgSentiments[sector]),
+                        borderColor: getSectorColor(index),
+                        fill: false,
+                        tension: 0.1
+                    }))
+                },
+                options: {
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: 'black',
+                                fontSize: 14
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                color: 'black',
+                                fontSize: 14
+                                
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'black',
+                                fontSize: 14
+                            }
+                        }
+                    }
+                }
+            }
+        );
+    
+    });
+</script>
+
+
+{% endblock %}

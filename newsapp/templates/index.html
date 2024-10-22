@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="container-fluid mt-2">
+    <div class="row">
+        <div class="col-md-10">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">About</h5>
+                            <p class="card-text">Welcome to my final university project! I'm Charlotte, and I've created this platform to offer educational and insightful analysis on US stocks. 
+                                Here, you can explore how sentiments from news articles align with stock prices, view predictions based on sentiment analysis, and delve into various stock market characteristics. 
+                                Perfect for those new to the world of stocks and sentiment analysis.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">Educational sources</h5>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Source Name</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><a href="https://www.youtube.com/@ThePlainBagel" target="_blank">The Plain Bagel</a></td>
+                                        <td>Easy to digest videos about stock market fundamentals.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href="https://www.investopedia.com/investing-4427685" target="_blank">Investopedia</a></td>
+                                        <td>Comprehensive resource for investing and financial education.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href="https://finviz.com/" target="_blank">Finviz</a></td>
+                                        <td>A platform where you can practice paper trading to get a feel for stock trading.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href="https://www.investor.gov/introduction-investing/investing-basics/investment-products/stocks" target="_blank">Investor.gov</a></td>
+                                        <td>Official US government site with essential/basic information on investing.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-1">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">Word cloud for popular news topics</h5>
+                            <img class="img-fluid" src="{% static 'wordcloud.png' %}" alt="Word Cloud">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">Dow Jones</h5>
+                            <canvas id="DJChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card mb-1">
+                <div class="card-body">
+                    <p style="margin-bottom: 0px;"><b>Average Sentiment Past Week: </b>{{ avg_sent_pw|floatformat:2 }}/{{ sent_cat_pw }}</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Favourite Stocks</h5>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Stock</th>
+                                <th>Price</th>
+                                <th>Sentiment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock in fave_stocks_info %}
+                            <tr>
+                                <td>{{ stock.stock_name }}</td>
+                                <td>{{ stock.price|floatformat:2 }}</td>
+                                <td>{{ stock.sent_fave }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3">No favourite stocks. Log in or favourite stocks to access this feature.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const DJDates = JSON.parse('{{ DJDates|safe }}');
+        const DJVals = JSON.parse('{{ DJVals|safe }}');
+    
+        const DJCtx = document.getElementById('DJChart').getContext('2d');
+        new Chart(DJCtx, {
+            type: 'line',
+            data: {
+                labels: DJDates,
+                datasets: [{
+                    label: 'Dow Jones Close',
+                    data: DJVals,
+                    borderColor: 'rgb(75, 192, 235)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}
